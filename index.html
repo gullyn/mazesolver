@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+	<body>
+		<canvas id="canvas"></canvas>
+		<script>
+			const canvas = document.getElementById("canvas");
+			const ctx = canvas.getContext("2d");
+			
+			const width = 30;
+			const height = 30;
+			
+			canvas.width = width * 20 + 2;
+			canvas.height = height * 20 + 2;
+			
+			let board = [];
+			let visited = [];
+			let done = false;
+			const TIME = 0, ATIME = 50;
+			const LINE_MODE = true;
+			
+			let openSet = [], closedSet = [];
+			let acurrent, aend, adone = false;
+			let frameMod = 0;
+			
+			class Tile
+			{
+				constructor(x, y)
+				{
+					this.x = x, this.y = y;
+					this.h = 0, this.g = 0, this.f = 0;
+					this.walls = [true, true, true, true];
+					this.previous = null;
+				}
+			}
+			
+			for (let x = 0; x < width; x++)
+			{
+				board.push([]);
+				
+				for (let y = 0; y < height; y++)
+				{
+					board[board.length - 1][y] = new Tile(x, y);
+				}
+			}
+			
+			let current = board[0][0];
+			
+			function frame()
+			{
+				let neighbours = getNeighbours(current);
+				if (neighbours.length === 0)
+				{
+					if (visited.length === width * height)
+					{
+						console.log("Maze made");
+						done = true;
+						window.setTimeout(astart, 0);
+						return;
+					}
+					
+					let possible = [];
+					
+					for (let elem of visited)
+					{
+						if (getNeighbours(elem).length > 0)
+						{
+							possible.push(elem);
+						}
+					}
+					
+					current = possible[Math.floor(Math.random() * possible.length)];
+					frame();
+					return;
+				}
+				
+				let next = neighbours[Math.floor(Math.random() * neighbours.length)];
+				
+				removeWall(current, next);
+				if (++frameMod % 5 === 0)
+				{
+					renderBoard();
+				}
+				
+				current = next;
+				visited.push(current);
+				
+				if (!done)
+				{
+					window.setTimeout(frame, TIME);
+				}
+			}
+			
+			function renderBoard(arender)
+			{
+				arender = arender || false;
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				
+				if (arender)
+				{
+					for (let tile of openSet)
+					{
+						ctx.fillStyle = "rgba(0, 255, 0, 1)";
+						ctx.fillRect(tile.x * 20, tile.y * 20, 20, 20);
+					}
+					
+					for (let tile of closedSet)
+					{
+						ctx.fillStyle = "rgba(255, 0, 0, 1)";
+						ctx.fillRect(tile.x * 20, tile.y * 20, 20, 20);
+					}
+					
+					let temp = acurrent;
+					let path = [temp];
+					
+					while (temp.previous)
+					{
+						path.push(temp.previous);
+						temp = temp.previous;
+					}
+					
+					if (LINE_MODE)
+					{
+						ctx.beginPath();
+						ctx.lineWidth = 5;
+						for (let tile of path)
+						{
+							ctx.lineTo(tile.x * 20 + 10, tile.y * 20 + 10);
+						}
+						ctx.strokeStyle = "blue";
+						ctx.stroke();
+					}
+					else
+					{
+						for (let tile of path)
+						{
+							ctx.fillStyle = "rgba(0, 0, 255, 1)";
+							ctx.fillRect(tile.x * 20, tile.y * 20, 20, 20);
+						}
+					}
+				}
+
+				ctx.fillStyle = "black";
+				
+				for (let x in board)
+				{
+					for (let y in board[x])
+					{
+						let tile = board[x][y];
+						
+						if (tile.walls[0])
+						{
+							ctx.fillRect(20 * tile.x, 20 * tile.y, 20, 2);
+						}
+						
+						if (tile.walls[1])
+						{
+							ctx.fillRect(20 * tile.x, 20 * tile.y, 2, 20);
+						}
+						
+						if (tile.walls[2])
+						{
+							ctx.fillRect(20 * tile.x, 20 * tile.y + 20, 20, 2);
+						}
+						
+						if (tile.walls[3])
+						{
+							ctx.fillRect(20 * tile.x + 20, 20 * tile.y, 2, 20);
+						}
+					}
+				}
+			}
+			
+			window.addEventListener("keydown", event =>
+			{
+				if (event.key === " ")
+				{
+					frame();
+				}
+			});
+			
+			function getNeighbours(current, excludeWalls)
+			{
+				let list = [];
+				excludeWalls = excludeWalls || false;
+				
+				if (current.x !== 0 && !(excludeWalls && current.walls[1]))
+				{
+					list.push(board[current.x - 1][current.y]);
+				}
+				
+				if (current.x !== width - 1 && !(excludeWalls && current.walls[3]))
+				{
+					list.push(board[current.x + 1][current.y]);
+				}
+				
+				if (current.y !== 0 && !(excludeWalls && current.walls[0]))
+				{
+					list.push(board[current.x][current.y - 1]);
+				}
+				
+				if (current.y !== height - 1 && !(excludeWalls && current.walls[2]))
+				{
+					list.push(board[current.x][current.y + 1]);
+				}
+				
+				if (!excludeWalls)
+				{
+					for (let i = list.length - 1; i > -1; i--)
+					{
+						if (visited.includes(list[i]))
+						{
+							list.splice(i, 1);
+						}
+					}
+				}
+				
+				return list;
+			}
+			
+			function removeWall(current, next)
+			{
+				if (next.x > current.x)
+				{
+					current.walls[3] = false;
+					next.walls[1] = false;
+				}
+				else if (next.x < current.x)
+				{
+					current.walls[1] = false;
+					next.walls[3] = false;
+				}
+				else if (next.y > current.y)
+				{
+					current.walls[2] = false;
+					next.walls[0] = false;
+				}
+				else
+				{
+					current.walls[0] = false;
+					next.walls[2] = false;
+				}
+			}
+			
+			function aframe()
+			{
+				if (openSet.length === 0)
+				{
+					adone = true;
+					console.log("No solution");
+					return;
+				}
+				
+				let winner = 0;
+				
+				for (let i = 0; i < openSet.length; i++)
+				{
+					if (openSet[i].f < openSet[winner].f)
+					{
+						winner = i;
+					}
+				}
+				
+				acurrent = openSet[winner];
+				
+				if (acurrent === aend)
+				{
+					adone = true;
+					console.log("Found solution");
+					renderBoard(true);
+					window.setInterval(function()
+					{
+						renderBoard(true);
+					}, 50);
+					return;
+				}
+				
+				closedSet.push(acurrent);
+				removeFromArray(openSet, acurrent);
+				
+				let neighbours = getNeighbours(acurrent, true);
+				
+				for (let neighbour of neighbours)
+				{
+					if (closedSet.includes(neighbour)) { continue; }
+					
+					let tempG = acurrent.g + 1;
+					
+					if (openSet.includes(neighbour))
+					{
+						if (tempG < neighbour.g)
+						{
+							neighbour.g = tempG;
+						}
+					}
+					else
+					{
+						neighbour.g = tempG;
+						openSet.push(neighbour);
+					}
+					
+					neighbour.h = heuristic(neighbour, aend);
+					neighbour.f = neighbour.h + neighbour.g;
+					neighbour.previous = acurrent;
+				}
+				
+				renderBoard(true);
+				window.setTimeout(aframe, ATIME);
+			}
+			
+			function heuristic(point, end)
+			{
+				return Math.abs(point.x - end.x) + Math.abs(point.y - end.y);
+			}
+			
+			function astart()
+			{
+				acurrent = board[0][0];
+				aend = board[width - 1][height - 1];
+				openSet.push(acurrent);
+				aframe();
+			}
+			
+			function removeFromArray(arr, elem)
+			{
+				for (let i = arr.length - 1; i > -1; i--)
+				{
+					if (arr[i] === elem)
+					{
+						arr.splice(i, 1);
+					}
+				}
+			}
+			
+			renderBoard();
+		</script>
+	</body>
+</html>
